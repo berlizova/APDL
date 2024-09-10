@@ -86,11 +86,11 @@ for line in lines:
         continue
     elif "PARTICIPATION FACTOR CALCULATION *****  Z  DIRECTION" in line:
         in_z_direction = True
-        in_x_direction = in_y_direction = in_rotx_direction = in_roty_direction = in_rotz_direction = in_effective_mass_section = False
+        in_x_direction = in_y_direction = in_rotx_direction = in_roty_direction = in_effective_mass_section = False
         continue
     elif "PARTICIPATION FACTOR CALCULATION *****ROTX DIRECTION" in line:
         in_rotx_direction = True
-        in_x_direction = in_y_direction = in_z_direction = in_roty_direction = in_rotz_direction = in_effective_mass_section = False
+        in_x_direction = in_y_direction = in_z_direction = in_roty_direction = in_effective_mass_section = False
         continue
     elif "PARTICIPATION FACTOR CALCULATION *****ROTY DIRECTION" in line:
         in_roty_direction = True
@@ -102,7 +102,7 @@ for line in lines:
         continue
     elif "***** MODAL MASSES, KINETIC ENERGIES, AND TRANSLATIONAL EFFECTIVE MASSES SUMMARY *****" in line:
         in_effective_mass_section = True
-        in_x_direction = in_y_direction = in_z_direction = in_rotx_direction = in_roty_direction = in_rotz_direction = False
+        in_x_direction = in_y_direction = in_z_direction = in_rotx_direction = in_roty_direction = False
         continue
 
     # Stop capturing data when section ends
@@ -113,7 +113,6 @@ for line in lines:
     columns = line.split()
     if len(columns) >= 8:
         if in_x_direction:
-            # Skip the header row if it's duplicated
             if columns[0] == 'MODE':
                 continue
             x_direction_data["MODE"].append(columns[0])
@@ -150,10 +149,8 @@ for line in lines:
             rot_z_direction_data["FREQUENCY"].append(columns[1])
             rot_z_direction_data["RATIO"].append(columns[4])
         elif in_effective_mass_section and len(columns) >= 11:
-            # Skip the header row if found
             if columns[0] == 'MODE':
                 continue
-            # Extract the data for the Effective Mass Summary
             mass_summary_data["MODE"].append(columns[0])
             mass_summary_data["FREQUENCY"].append(columns[1])
             mass_summary_data["MODAL MASS"].append(columns[2])
@@ -173,6 +170,15 @@ df_rotx = pd.DataFrame(rot_x_direction_data)
 df_roty = pd.DataFrame(rot_y_direction_data)
 df_rotz = pd.DataFrame(rot_z_direction_data)
 df_mass_summary = pd.DataFrame(mass_summary_data)
+
+# Convert columns to numeric where applicable (excluding MODE)
+def convert_to_numeric(df, columns_to_convert):
+    for column in columns_to_convert:
+        df[column] = pd.to_numeric(df[column], errors='coerce')
+
+# Apply numeric conversion to all sheets
+for df in [df_x, df_y, df_z, df_rotx, df_roty, df_rotz, df_mass_summary]:
+    convert_to_numeric(df, df.columns.difference(["MODE"]))
 
 # Create a summary DataFrame that consolidates the sums of RATIO from each direction
 summary_data = {
@@ -205,23 +211,32 @@ with pd.ExcelWriter(output_excel_path, engine='xlsxwriter') as writer:
     df_mass_summary.to_excel(writer, sheet_name='Effective Mass Summary', index=False)
     df_summary.to_excel(writer, sheet_name='Summary', index=False)
 
-# Load the newly created Excel file with openpyxl to add formatting (highlighting max values)
+# Load the newly created Excel file with openpyxl to add formatting (highlighting values >= 1)
 wb = load_workbook(output_excel_path)
 ws = wb["Summary"]
 
 # Define the green fill for highlighting
 green_fill = PatternFill(start_color="00FF00", end_color="00FF00", fill_type="solid")
 
-# Iterate over columns C to N (those containing the ratios) to highlight max values
-for col in range(3, ws.max_column + 1):
-    # Find the max value in this column
-    column_values = [cell for cell in ws.iter_cols(min_col=col, max_col=col, min_row=2, values_only=True)]
-    max_value = max([item for sublist in column_values for item in sublist if item is not None])  # Flattening and ignoring None values
+# Iterate over columns C to N (those containing the ratios) to apply the green fill for values >= 1
+for row in range(2, ws.max_row + 1):
+    row_has_value_above_1 = False
+    for col in range(3, ws.max_column + 1):
+        cell = ws.cell(row=row, column=col)
+        try:
+            value = float(cell.value)
+            if value >= 1:
+                cell.fill = green_fill
+                row_has_value_above_1 = True
+        except (ValueError, TypeError):
+            continue
+    # If any cell in the row has a value >= 1, highlight the MODE and FREQUENCY columns
+    if row_has_value_above_1:
+        ws.cell(row=row, column=1).fill = green_fill  # Highlight MODE column
+        ws.cell(row=row, column=2).fill = green_fill  # Highlight FREQUENCY column
 
-    # Apply the green fill to cells with the max value
-    for cell in ws.iter_cols(min_col=col, max_col=col, min_row=2):
-        if cell[0].value == max_value:
-            cell[0].fill = green_fill
+# Move the "Summary" sheet to the first position
+wb._sheets = [wb["Summary"]] + [sheet for sheet in wb._sheets if sheet.title != "Summary"]
 
 # Save the workbook with formatting applied
 wb.save(output_excel_path)
