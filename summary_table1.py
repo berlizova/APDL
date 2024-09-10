@@ -4,7 +4,7 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 
 # Define the path to the solve.out file
-solve_out_path = r'C:\Users\tebe\Documents\test\solve.out'  # Update the path to solve.out
+solve_out_path = r'C:\Users\tebe\Documents\test\X_Wind_Cross\solve.out'  # Update the path to solve.out
 
 # Define the output Excel file path (same folder as solve.out)
 output_excel_path = os.path.join(os.path.dirname(solve_out_path), "EffectiveMassResults.xlsx")
