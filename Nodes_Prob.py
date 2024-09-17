@@ -37,34 +37,51 @@ def read_node_ids_from_excel(file_path, sheet_number):
     return node_ids
 
 
+##################################################################################################################
+# Section where changes need to be made
+###################################################################################################################
+# Start
 # Specify the path to the Excel file
 excel_file_path = r'K:\Groups\ONGDSGE3\BE\RESS\000_INITIAL_STUDIES\04_QAD_3\04_ANALYSIS\t.berlizova\002_script\001_Nod_ID_Script\Nodes.xlsx'
 
-# Specify the analysis
-analysis = ExtAPI.DataModel.Project.Model.Analyses[0]  # [0] - Analysis number
+# Specify the analysis (change the index as needed)
+analysis = ExtAPI.DataModel.Project.Model.Analyses[2]  # [0] - Analysis number
 
 # Define result objects and corresponding sheet numbers in the Excel file
 result_objects_sheets = {
-    'Main_beam': 1,  # Sheet number 1
-    'Badframe': 2,  # Sheet number 2
-    'Gen_Rear_beam': 4,  # Sheet number 2
-    'Gen_Front_bam': 3,  # Sheet number 2
-    #    'Third_beam': 3  # Add more as needed
+
+    'Main_beam': 1,  # 'Name Results': Sheet number 1
+    'Badframe': 2,  # 'Name Results': Sheet number 2
+    'Gen_Rear_beam': 4,  # 'Name Results': Sheet number 4
+    'Gen_Front_beam': 3,  # 'Name Results': Sheet number 3
+    'Front_beam': 5,  # 'Name Results': Sheet number 1
+    'Rear_beam': 6,  # 'Name Results': Sheet number 1
+    'CT_inetface': 7,  # 'Name Results': Sheet number 1
+    'TU_interface': 8,  # 'Name Results': Sheet number 1
+    'Total Deformations (RESS+NSS only)': 9,
+
+    # Add more results and corresponding sheet numbers as needed
 }
+
+# Finish
+###################################################################################################################
 
 ###################################################################################################################
 # Loop through the defined result objects and corresponding sheet numbers
 ###################################################################################################################
 for result_name, sheet_number in result_objects_sheets.items():
-    # Get the result object by name
-    resultObjects = ExtAPI.DataModel.GetObjectsByName(result_name)
+    # Get all result objects from the selected analysis
+    results_in_analysis = analysis.Solution.Children  # Retrieve all results for the selected analysis
+
+    # Check if there is a result with the specified name in the analysis
+    resultObjects = [res for res in results_in_analysis if res.Name == result_name]
 
     # Check if the object with the given name exists
     if resultObjects is None or len(resultObjects) == 0:
-        print("No object found with name: " + result_name)
+        print("No object found with name: " + result_name + " in the specified analysis.")
         continue  # Skip to the next object if none found
 
-    resultObject = resultObjects[0]  # Take the first object
+    resultObject = resultObjects[0]  # Take the first matching object
 
     # Read nodeIDs from the corresponding sheet number
     node_ids = read_node_ids_from_excel(excel_file_path, sheet_number)
@@ -73,4 +90,5 @@ for result_name, sheet_number in result_objects_sheets.items():
     for nodeID in node_ids:
         probeLabel = Graphics.LabelManager.CreateProbeLabel(resultObject)
         probeLabel.Scoping.Node = nodeID
-        print("Probe created for Node " + str(nodeID) + " in " + result_name)
+        # Print the message including the result name, node ID, and analysis name
+        print("Probe created for Node " + str(nodeID) + " in " + result_name + " (Analysis: " + analysis.Name + ")")
